@@ -39,6 +39,7 @@
     background: #000;
     opacity: 0.2;
     margin: 0 3px;
+    cursor: pointer;
   }
   .mint-swipe-indicator.is-active {
     background: #fff;
@@ -54,7 +55,8 @@
       <div class="mint-swipe-indicator"
            v-for="(page, $index) in pages"
            :key="$index"
-           :class="{ 'is-active': $index === index }"></div>
+           :class="{ 'is-active': $index === index }"
+           @click="goto($index)"></div>
     </div>
   </div>
 </template>
@@ -76,6 +78,7 @@
         dragging: false,
         userScrolling: false,
         animating: false,
+        animateReady: false,
         index: 0,
         pages: [],
         timer: null,
@@ -203,6 +206,7 @@
       doAnimate(towards, options) {
         if (this.$children.length === 0) return;
         if (!options && this.$children.length < 2) return;
+        if (this.animateReady) return;
 
         var prevPage, nextPage, currentPage, pageWidth, offsetLeft;
         var speed = this.speed || 300;
@@ -222,7 +226,7 @@
             nextPage = pages[index + 1];
           }
 
-          if (this.continuous && pages.length > 1) {
+          if (this.continuous && pages.length > 1 && towards !== 'goto') {
             if (!prevPage) {
               prevPage = pages[pages.length - 1];
             }
@@ -288,7 +292,13 @@
           if (nextPage) {
             nextPage.style.display = '';
           }
+
+          this.setAutoPaging();
+          this.animateReady = false;
         };
+
+        this.clearAutoPagingTimer();
+        this.animateReady = true;
 
         setTimeout(() => {
           if (towards === 'next') {
@@ -351,6 +361,23 @@
             newIndex,
             nextPage: this.pages[newIndex]
           });
+        }
+      },
+
+      setAutoPaging() {
+        if (this.auto > 0) {
+          this.timer = setInterval(() => {
+            if (!this.dragging && !this.animating) {
+              this.next();
+            }
+          }, this.auto);
+        }
+      },
+
+      clearAutoPagingTimer() {
+        if (this.timer) {
+          clearInterval(this.timer);
+          this.timer = null;
         }
       },
 
@@ -519,10 +546,7 @@
     },
 
     destroyed() {
-      if (this.timer) {
-        clearInterval(this.timer);
-        this.timer = null;
-      }
+      this.clearAutoPagingTimer();
       if (this.reInitTimer) {
         clearTimeout(this.reInitTimer);
         this.reInitTimer = null;
@@ -532,13 +556,7 @@
     mounted() {
       this.ready = true;
 
-      if (this.auto > 0) {
-        this.timer = setInterval(() => {
-          if (!this.dragging && !this.animating) {
-            this.next();
-          }
-        }, this.auto);
-      }
+      this.setAutoPaging();
 
       this.reInitPages();
 
